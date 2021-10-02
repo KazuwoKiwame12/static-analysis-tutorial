@@ -5,60 +5,58 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/inspect"
+	"golang.org/x/tools/go/ast/inspector"
 )
 
 var Analyzer = &analysis.Analyzer{
-	Name: "goprintffuncname",
-	Doc:  "Checks that printf-like functions are named with `f` at the end.",
-	Run:  run,
+	Name:     "goprintffuncname",
+	Doc:      "Checks that printf-like functions are named with `f` at the end.",
+	Run:      run,
+	Requires: []*analysis.Analyzer{inspect.Analyzer},
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
-	inspect := func(node ast.Node) bool {
-		funcDecl, ok := node.(*ast.FuncDecl)
-		if !ok {
-			return true
-		}
+	inspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
+	nodeFilter := []ast.Node{ // 関数定義のノードのみを訪れるようにフィルターの設定
+		(*ast.FuncDecl)(nil),
+	}
+	inspector.Preorder(nodeFilter, func(node ast.Node) {
+		funcDecl := node.(*ast.FuncDecl)
 
 		params := funcDecl.Type.Params.List
 		if len(params) != 2 {
-			return true
+			return
 		}
 		firstParamType, ok := params[0].Type.(*ast.Ident)
 		if !ok {
-			return true
+			return
 		}
 
 		if firstParamType.Name != "string" {
-			return true
+			return
 		}
 
 		secondParamType, ok := params[1].Type.(*ast.Ellipsis)
 		if !ok {
-			return true
+			return
 		}
 
 		elementType, ok := secondParamType.Elt.(*ast.InterfaceType)
 		if !ok {
-			return true
+			return
 		}
 
 		if elementType.Methods != nil && len(elementType.Methods.List) != 0 {
-			return true
+			return
 		}
 
 		if strings.HasSuffix(funcDecl.Name.Name, "f") {
-			return true
+			return
 		}
 
 		pass.Reportf(node.Pos(), "printf-like formatting function '%s' should be named '%sf'",
 			funcDecl.Name.Name, funcDecl.Name.Name)
-		return true
-	}
-
-	for _, f := range pass.Files {
-		ast.Inspect(f, inspect)
-	}
-
+	})
 	return nil, nil
 }
