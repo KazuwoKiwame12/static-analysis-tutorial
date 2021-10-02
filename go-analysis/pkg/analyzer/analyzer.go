@@ -25,24 +25,25 @@ func run(pass *analysis.Pass) (interface{}, error) {
 		funcDecl := node.(*ast.FuncDecl)
 
 		params := funcDecl.Type.Params.List
-		if len(params) != 2 {
+		if len(params) < 2 {
 			return
 		}
-		firstParamType, ok := params[0].Type.(*ast.Ident)
+
+		formatParamType, ok := params[len(params)-2].Type.(*ast.Ident)
 		if !ok {
 			return
 		}
 
-		if firstParamType.Name != "string" {
+		if formatParamType.Name != "string" {
 			return
 		}
 
-		secondParamType, ok := params[1].Type.(*ast.Ellipsis)
+		argsParamType, ok := params[len(params)-1].Type.(*ast.Ellipsis)
 		if !ok {
 			return
 		}
 
-		elementType, ok := secondParamType.Elt.(*ast.InterfaceType)
+		elementType, ok := argsParamType.Elt.(*ast.InterfaceType)
 		if !ok {
 			return
 		}
